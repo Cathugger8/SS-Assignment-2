@@ -25,6 +25,9 @@ int main(int argc, char *argv[])
 
         // Variable to store incoming client's IP address and port
         struct sockaddr_in client_address;
+
+        char addr_str[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &(client_address.sin_addr), addr_str, INET_ADDRSTRLEN);
     
         // This function reads incoming client request from
         // the socket at sd.
@@ -34,9 +37,34 @@ int main(int argc, char *argv[])
         // Successfully received an incoming request
         if (rc > 0)
         {
+            int upper = 0;
+            int lower = 0;
+
+            for (int i = 0; client_request[i] != '\0'; i++) {
+                char c = client_request[i];
+
+                if (c >= 'A' && c <= 'Z') {
+                    upper = 1;
+                }
+                else if (c >= 'a' && c <= 'z') {
+                    lower = 1;
+                }
+            }
             // Demo code (remove later)
             strcpy(server_response, "Hi, the server has received: ");
             strcat(server_response, client_request);
+            strcat(server_response, " from the IP address: ");
+            strcat(server_response, addr_str);
+            strcat(server_response, " This request contains ");
+            if (upper && !lower) {
+                strcat(server_response, "only upper case");
+            }
+            else if (!upper && lower) {
+                strcat(server_response, "only lower case");
+            }
+            else if (upper && lower) {
+                strcat(server_response, "mixed case");
+            }
             strcat(server_response, "\n");
 
             // This function writes back to the incoming client,
