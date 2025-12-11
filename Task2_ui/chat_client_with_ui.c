@@ -46,11 +46,7 @@ void *listener_thread(void *arg)
             wprintw(ctx->chat_win, "[SERVER] %s", server_response);
             wrefresh(ctx->chat_win);
 
-            // restore input prompt in input window
-            int iy, ix;
-            getmaxyx(ctx->input_win, iy, ix);
-            mvwprintw(ctx->input_win, 1, 1, "> ");
-            wrefresh(ctx->input_win);
+            
 
             pthread_mutex_unlock(&ctx->ui_lock);
         } else if (rc <= 0) {
@@ -76,13 +72,15 @@ void *sender_thread(void *arg)
         wmove(ctx->input_win, 1, 3);  // after '> '
         wclrtoeol(ctx->input_win);
         wrefresh(ctx->input_win);
+        
+        pthread_mutex_unlock(&ctx->ui_lock);
 
         // Enable echo locally just for this window if you want
         echo();
         wgetnstr(ctx->input_win, client_request, BUFFER_SIZE - 1);
         noecho();
 
-        pthread_mutex_unlock(&ctx->ui_lock);
+        
 
 
         size_t len = strlen(client_request);
@@ -109,15 +107,6 @@ void *sender_thread(void *arg)
         }
 
 
-        // Optionally echo sent message into chat window as "You: ..."
-        pthread_mutex_lock(&ctx->ui_lock);
-        int cy, cx;
-        getmaxyx(ctx->chat_win, cy, cx);
-        wmove(ctx->chat_win, cy - 2, 1);
-        wclrtoeol(ctx->chat_win);
-        wprintw(ctx->chat_win, "You: %s", client_request);
-        wrefresh(ctx->chat_win);
-        pthread_mutex_unlock(&ctx->ui_lock);
     }
 
     return NULL;
@@ -142,6 +131,7 @@ int main(int argc, char *argv[])
     cbreak();               // disable line buffering
     noecho();               // don't echo typed chars automatically
     keypad(stdscr, TRUE);   // enable special keys
+    raw();
 
     int rows, cols;
 getmaxyx(stdscr, rows, cols);

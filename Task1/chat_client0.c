@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
     char client_request[BUFFER_SIZE], server_response[BUFFER_SIZE];
 
     // Demo code (remove later)
-    strcpy(client_request, "Dummy Request");
+    strcpy(client_request, "D");
 
     // This function writes to the server (sends request)
     // through the socket at sd.
