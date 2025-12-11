@@ -38,6 +38,60 @@ void append(struct Node** head, char *client_name, char *client_IP) {
     }
     temp->next = new_node;
 }
+typedef struct {
+    int sd;
+    volatile int running;
+} server_context_t;
+
+void listener_thread(void *arg)
+{
+    server_context_t *ctx = (server_context_t *)arg;
+
+    char client_request[BUFFER_SIZE];
+    struct sockaddr_in client_addr;
+
+    while (ctx->running) {
+        int rc = udp_socket_read(ctx->sd, &client_addr, client_request, BUFFER_SIZE);
+
+        if (rc > 0) {
+            if (rc < BUFFER_SIZE)
+                client_request[rc] = '\0';
+            else
+                client_request[BUFFER_SIZE - 1] = '\0';
+
+            printf("Received request: %s\n", client_request);
+
+            handle_request(ctx, &client_addr, client_request, rc);
+        } else if (rc < 0) {
+            perror("udp_socket_read");
+            break;
+        }
+    }
+
+    printf("Listener thread exiting.\n");
+    return NULL;
+}
+
+void parse_request(char *buffer, char **command, char **content) {
+    size_t len = strlen(buffer);
+    if (len > 0 && buffer[len - 1] == '\n') {
+        buffer[len - 1] = '\0';
+    }
+
+    *command = strtok(buffer, "$"); // tokenise everything before the $
+    *content = strtok(NULL, "\0"); // tokenise  everything after the $
+
+    if (*content == NULL) {
+        *content = "";
+    }
+
+    while (**content == ' ')
+        (*content)++;
+}
+
+void handle_request(server_context_t *ctx, struct sockaddr_in *client_addr, char *client_request, int length) {
+
+}
 
 int main(int argc, char *argv[])
 {
@@ -118,3 +172,4 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+

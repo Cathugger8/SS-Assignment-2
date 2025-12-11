@@ -101,3 +101,12 @@ int udp_socket_write(int sd, struct sockaddr_in *addr, char *buffer, int n)
     int addr_len = sizeof(struct sockaddr_in);
     return sendto(sd, buffer, n, 0, (struct sockaddr *)addr, addr_len);
 }
+
+typedef struct {
+    int sd;
+    volatile int running;
+} server_context_t;
+
+void handle_request(server_context_t *ctx, struct sockaddr_in *client_addr, char *client_request, int length);
+
+void parse_request(char *buffer, char **command, char **content);
