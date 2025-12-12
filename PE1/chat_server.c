@@ -135,6 +135,7 @@ void send_to_client(server_context_t *ctx, struct Node *client, const char *msg)
     udp_socket_write(ctx->sd, &client->addr, (char *)msg, BUFFER_SIZE);
 }
 
+// broadcast a message
 void broadcast_message(server_context_t *ctx, struct Node *sender, const char *msg)
 {
     pthread_rwlock_rdlock(&ctx->clients_lock);
@@ -177,6 +178,7 @@ void *listener_thread(void *arg)
     return NULL;
 }
 
+// tokenise requests
 void parse_request(char *buffer, char **command, char **content) {
     size_t len = strlen(buffer);
     if (len > 0 && buffer[len - 1] == '\n') {
@@ -190,10 +192,10 @@ void parse_request(char *buffer, char **command, char **content) {
         *content = "";
     }
 
-    while (**content == ' ')
-        (*content)++;
+    while (**content == ' ') (*content)++;
 }
 
+// connect client and also output last 15 global messages
 void handle_conn(server_context_t *ctx, struct sockaddr_in *client_addr, const char *name)
 {
     pthread_rwlock_wrlock(&ctx->clients_lock);
@@ -212,8 +214,14 @@ void handle_conn(server_context_t *ctx, struct sockaddr_in *client_addr, const c
     char response[BUFFER_SIZE];
     snprintf(response, sizeof(response), "Hi %s, you have successfully connected to the chat", existing->client_name);
     send_to_client(ctx, existing, response);
+
+    for (int i = 0; i < ctx->global_count; i++) {
+        int idx = (ctx->global_start + i) % GLOBAL_BUFFER_SIZE;
+        send_to_client(ctx, existing, ctx->global_buffer[idx]);
+    }
 }
 
+// send a message to all clients and store message in global buffer
 void handle_say(server_context_t *ctx, struct sockaddr_in *client_addr, const char *msg)
 {
     struct Node *sender = find_client_by_addr(ctx, client_addr);
@@ -221,9 +229,23 @@ void handle_say(server_context_t *ctx, struct sockaddr_in *client_addr, const ch
 
     char buffer[BUFFER_SIZE];
     snprintf(buffer, sizeof(buffer), "%s: %s", name, msg);
+
+    if (ctx->global_count < GLOBAL_BUFFER_SIZE) {
+        int idx = (ctx->global_start + ctx->global_count) % GLOBAL_BUFFER_SIZE;
+        strncpy(ctx->global_buffer[idx], buffer, BUFFER_SIZE - 1);
+        ctx->global_buffer[idx][BUFFER_SIZE - 1] = '\0';
+        ctx->global_count++;
+    } else {
+        int idx = ctx->global_start;
+        strncpy(ctx->global_buffer[idx], buffer, BUFFER_SIZE - 1);
+        ctx->global_buffer[idx][BUFFER_SIZE - 1] = '\0';
+        ctx->global_start = (ctx->global_start + 1) % GLOBAL_BUFFER_SIZE;
+    }
+
     broadcast_message(ctx, sender, buffer);
 }
 
+// send a message to one person (don't store in global buffer)
 void handle_sayto(server_context_t *ctx, struct sockaddr_in *client_addr, char *content)
 {
     struct Node *sender = find_client_by_addr(ctx, client_addr);
@@ -251,6 +273,7 @@ void handle_sayto(server_context_t *ctx, struct sockaddr_in *client_addr, char *
     send_to_client(ctx, recipient, buffer);
 }
 
+// disconnect client (client will also do a local disconnect)
 void handle_disconn(server_context_t *ctx, struct sockaddr_in *client_addr)
 {
     pthread_rwlock_wrlock(&ctx->clients_lock);
@@ -284,6 +307,7 @@ void handle_disconn(server_context_t *ctx, struct sockaddr_in *client_addr)
     pthread_rwlock_unlock(&ctx->clients_lock);
 }
 
+// change client name in linked list
 void handle_rename(server_context_t *ctx, struct sockaddr_in *client_addr, const char *new_name)
 {
     pthread_rwlock_wrlock(&ctx->clients_lock);
@@ -301,6 +325,7 @@ void handle_rename(server_context_t *ctx, struct sockaddr_in *client_addr, const
     }
 }
 
+// mute other clients
 void handle_mute(server_context_t *ctx, struct sockaddr_in *client_addr, const char *name)
 {
     pthread_rwlock_wrlock(&ctx->clients_lock);
@@ -311,6 +336,7 @@ void handle_mute(server_context_t *ctx, struct sockaddr_in *client_addr, const c
     pthread_rwlock_unlock(&ctx->clients_lock);
 }
 
+// unmute other clients
 void handle_unmute(server_context_t *ctx, struct sockaddr_in *client_addr, const char *name)
 {
     pthread_rwlock_wrlock(&ctx->clients_lock);
@@ -321,6 +347,7 @@ void handle_unmute(server_context_t *ctx, struct sockaddr_in *client_addr, const
     pthread_rwlock_unlock(&ctx->clients_lock);
 }
 
+// if admin (server port = 6666), kick, otherwise don't
 void handle_kick(server_context_t *ctx, struct sockaddr_in *client_addr, const char *name)
 {
     if (client_addr->sin_port != htons(6666)) {
@@ -362,6 +389,7 @@ void handle_kick(server_context_t *ctx, struct sockaddr_in *client_addr, const c
     pthread_rwlock_unlock(&ctx->clients_lock);
 }
 
+// tokenise request and use handle_... functions to handle the request
 void handle_request(server_context_t *ctx, struct sockaddr_in *client_addr, char *client_request, int length)
 {
     char *command = NULL;
@@ -398,6 +426,7 @@ void handle_request(server_context_t *ctx, struct sockaddr_in *client_addr, char
     }
 }
 
+// initialise server
 int main(int argc, char *argv[])
 {
     int sd = udp_socket_open(SERVER_PORT);
@@ -409,6 +438,8 @@ int main(int argc, char *argv[])
     ctx.running = 1;
     ctx.clients_head = NULL;
     pthread_rwlock_init(&ctx.clients_lock, NULL);
+    ctx.global_count = 0;
+    ctx.global_start = 0;
 
     pthread_t listener_tid;
     int rc = pthread_create(&listener_tid, NULL, listener_thread, &ctx);
