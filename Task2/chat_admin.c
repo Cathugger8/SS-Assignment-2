@@ -6,7 +6,7 @@
 #include <ctype.h>
 #include "udp.h"
 
-#define CLIENT_PORT 0
+#define CLIENT_PORT 6666
 
 //since this version of chat_client uses ncurses for ui, the way it is compiled is different
 //Also, pthread.h is included. So both of these appear as flags in the compile command:

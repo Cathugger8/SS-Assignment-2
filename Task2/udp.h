@@ -8,9 +8,12 @@
 #include <unistd.h>     // close()
 #include <string.h>     // memset(), memcpy()
 #include <assert.h>
+#include <pthread.h>
 
 #define BUFFER_SIZE 1024
 #define SERVER_PORT 12000
+
+struct Node; 
 
 int set_socket_addr(struct sockaddr_in *addr, const char *ip, int port)
 {
@@ -105,6 +108,8 @@ int udp_socket_write(int sd, struct sockaddr_in *addr, char *buffer, int n)
 typedef struct {
     int sd;
     volatile int running;
+    struct Node *clients_head;
+    pthread_rwlock_t clients_lock;
 } server_context_t;
 
 void handle_request(server_context_t *ctx, struct sockaddr_in *client_addr, char *client_request, int length);
