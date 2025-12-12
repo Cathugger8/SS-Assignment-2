@@ -12,6 +12,7 @@
 
 #define BUFFER_SIZE 1024
 #define SERVER_PORT 12000
+#define MAX_CLIENTS 32
 
 struct Node; 
 
@@ -120,6 +121,9 @@ typedef struct {
     char global_buffer[GLOBAL_BUFFER_SIZE][BUFFER_SIZE];
     int global_count;
     int global_start;
+
+    struct Node *activity_heap[MAX_CLIENTS];
+    int heap_size;
 } server_context_t;
 
 void handle_request(server_context_t *ctx, struct sockaddr_in *client_addr, char *client_request, int length);
